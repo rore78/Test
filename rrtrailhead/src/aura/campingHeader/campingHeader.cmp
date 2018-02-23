@@ -1,0 +1,11 @@
+<aura:component >
+	<!-- PAGE HEADER -->
+    <div class="slds-page-header" role="banner">
+      <div class="slds-grid">
+        <div class="slds-col">
+    		<p class="slds-text-heading--label">Campings</p>
+            <H1>Camping List</H1>
+        </div>
+      </div>
+    </div>
+</aura:component>

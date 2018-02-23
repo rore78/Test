@@ -1,0 +1,151 @@
+<apex:page showHeader="false">
+    <html>
+        <head>
+            <!-- 
+                This stylesheet contains specific styles for displaying the map on this page. Replace it with your own styles as described in the documentation:
+                https://developers.google.com/maps/documentation/javascript/tutorial 
+ 			-->
+            <!-- 
+			<link rel="stylesheet" href="//developers.google.com/maps/documentation/javascript/demos/demos.css"/> 
+			-->
+           
+            <apex:stylesheet value="{!$Resource.GoogleMap}"/>
+        </head>
+        <body>
+            
+            <div id="map"></div>
+            <script>
+            var lexOrigin = 'https://{!$CurrentPage.parameters.lcHost}';
+            console.log('Google Map lexOrigin: ' +  lexOrigin);
+            //Data for Google map
+            var data;
+            if (navigator.geolocation) {
+                console.log('oK');
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var pos = {
+                        lat: position.coords.latitude,
+              			lng: position.coords.longitude
+            		};
+                });
+            }
+            //Send message to LC
+            function sendToLC(message) {
+                if(typeof(lexOrigin) != 'undefined'){
+                    message = JSON.parse(JSON.stringify(message));
+                    parent.postMessage(message, lexOrigin);
+                }
+            }
+            
+            //Receive message from LC
+            window.addEventListener("message", function(event) {
+                console.log('Google Map eventOrigin' +  event.origin );
+                //If page is public (like used in force.com sites) then be careful about the origin
+                //if (event.origin !== lexOrigin) {
+                    // Not the expected origin: reject message!
+                    //return;
+                //}
+                // Handle message
+                console.log('Data Sent to VF: ', event.data);
+                data = event.data;
+    
+                
+                if(typeof(event.data.loadGoogleMap) != 'undefined'){
+                    //Load Google Map Script
+                    var script = document.createElement("script");
+                    script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyBX2pfBycTOz2NCrF2pShqzm4e1rVYPIWw&callback=initMap";
+                    console.log('Google Map Soure: ' +  script.src);
+                    document.getElementsByTagName("head")[0].appendChild(script);        
+                }
+            }, false);
+            
+            //Callback when Google Map is loaded
+            function initMap() {
+                //Add marker for each point along with text
+                function addMarker(feature) {
+                    var marker = new google.maps.Marker({
+                        position: feature.position,
+                        animation: google.maps.Animation.DROP,
+                        //icon: BitmapDescriptorFactory.fromResource(R.drawable.arrow),
+                        //icon: icons[feature.type].icon,
+                        map: map
+                    });
+                    var infoWindow = new google.maps.InfoWindow({
+                        content: feature.markerText
+                    });
+                    
+                    marker.addListener('click', function() {
+                        infoWindow.open(map, marker);
+                    	if (marker.getAnimation() !== null) {
+          					marker.setAnimation(null);
+        				} else {
+          					marker.setAnimation(google.maps.Animation.BOUNCE);
+        				}
+                    });
+                }
+                function addMarkerWithTimeout(feature, type, timeout) {
+        			window.setTimeout(function() {
+                        if(type == 'user'){
+                        	adduserMarker(feature);
+                        }else{
+                        	addMarker(feature);
+                        }
+                    }, timeout);
+     			}
+                
+                function adduserMarker(feature){
+                    var marker = new google.maps.Marker({
+                        position: feature.position,
+                        //animation: google.maps.Animation.DROP,
+                        icon: 'http://www.robotwoods.com/dev/misc/bluecircle.png',
+                        map: map
+                    });
+                }
+                
+                //Create new map
+                var map = new google.maps.Map(document.getElementById("map"), JSON.parse(data.mapOptions));
+
+                //Set map center
+                map.setCenter(data.mapOptionsCenter);
+                
+                // Try HTML5 geolocation.
+        		if (navigator.geolocation) {
+                    console.log('oK');
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        var pos = {
+                            lat: position.coords.latitude,
+              				lng: position.coords.longitude
+                        };
+                        addMarkerWithTimeout({position: pos, markerText: 'Location found.'  },'user', i * 10);
+          			}, function() {
+                        handleLocationError(true, new google.maps.InfoWindow({map: map}), map.getCenter());
+          				});
+        		} else {
+                    // Browser doesn't support Geolocation
+                    handleLocationError(false, new google.maps.InfoWindow({map: map}), map.getCenter());
+                }
+                
+                //iterate through map data for each point (even if 1)
+                var mapData = data.mapData;
+                //addMarkerWithTimeout({position: myLatlng, markerText: mapData[i].markerText },'user', i * 10);
+                for (var i = 0, j=mapData.length; i<j; i++) {
+                    var myLatlng = new google.maps.LatLng(mapData[i].lat, mapData[i].lng);
+                    addMarkerWithTimeout({position: myLatlng, markerText: mapData[i].markerText },'normal', i * 5000);
+        		}
+            }
+            function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+        		infoWindow.setPosition(pos);
+        		infoWindow.setContent(browserHasGeolocation ?
+                              'Error: The Geolocation service failed.' :
+                              'Error: Your browser doesn\'t support geolocation.');
+      		}
+            
+            //Let LC know that VF page been loaded along with it's URL
+            //LC will then send the data
+            //This is done because LC has no way to know that VF page in iFrame has been loaded, event listener set and ready for data
+            var vfHost = "{!LEFT($CurrentPage.URL,FIND('/',$CurrentPage.URL,9))}";
+            console.log('Google Map vfHost: ' +  vfHost);
+            sendToLC({'state':'LOADED', 'vfHost': vfHost});
+            </script>      
+    </body>
+    </html>
+</apex:page>
